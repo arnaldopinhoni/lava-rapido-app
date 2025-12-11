@@ -1,0 +1,9 @@
+# Nunca subir senha
+.env
+
+# Cache Python
+__pycache__/
+*.pyc
+
+# Ambiente virtual
+venv/
