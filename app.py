@@ -1,4 +1,8 @@
 import streamlit as st
+import os
+st.write("DEBUG_HOST:", os.getenv("DB_HOST"))
+st.write("DEBUG_USER:", os.getenv("DB_USER"))
+st.write("DEBUG_PASS:", os.getenv("DB_PASS"))
 from db import insert_car, get_all_cars, update_status, update_payment
 from datetime import time
 
