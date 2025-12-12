@@ -1,6 +1,5 @@
 import streamlit as st
 from datetime import date
-
 from db import (
     buscar_clientes_por_nome,
     inserir_cliente,
@@ -13,7 +12,7 @@ from db import (
 )
 
 # --------------------------------------------------
-# CONFIG
+# CONFIGURAÇÃO DA PÁGINA
 # --------------------------------------------------
 st.set_page_config(
     page_title="Lava Rápido",
@@ -32,9 +31,6 @@ menu = st.sidebar.radio(
 # ==================================================
 if menu == "Novo Serviço":
 
-    # ------------------------------
-    # CLIENTE
-    # ------------------------------
     st.subheader("Cliente")
 
     nome_cliente_raw = st.text_input("Nome do cliente")
@@ -43,14 +39,12 @@ if menu == "Novo Serviço":
 
     if nome_cliente:
         sugestoes = buscar_clientes_por_nome(nome_cliente)
-
         if not sugestoes.empty:
             nomes = sugestoes["nome"].tolist()
             escolha = st.selectbox(
                 "Clientes encontrados",
                 ["Novo cliente"] + nomes
             )
-
             if escolha != "Novo cliente":
                 cliente_id = int(
                     sugestoes[sugestoes["nome"] == escolha]["id"].iloc[0]
@@ -64,9 +58,6 @@ if menu == "Novo Serviço":
             cliente_id = inserir_cliente(nome_cliente, telefone)
             st.success("Cliente criado")
 
-    # ------------------------------
-    # CARRO
-    # ------------------------------
     if cliente_id:
         st.divider()
         st.subheader("Carro")
@@ -79,7 +70,6 @@ if menu == "Novo Serviço":
                 f"{row['marca']} {row['modelo']} - {row['placa']}"
                 for _, row in carros.iterrows()
             ]
-
             escolha_carro = st.selectbox(
                 "Escolha um carro",
                 ["Novo carro"] + opcoes
@@ -114,9 +104,6 @@ if menu == "Novo Serviço":
                 )
                 st.success("Carro cadastrado")
 
-    # ------------------------------
-    # SERVIÇO
-    # ------------------------------
     if cliente_id and carro_id:
         st.divider()
         st.subheader("Serviço")
@@ -126,26 +113,24 @@ if menu == "Novo Serviço":
                 "Tipo de serviço",
                 ["Lavagem", "Lavagem + Cera"]
             )
-
             valor = st.number_input(
                 "Valor (R$)",
                 min_value=0.0,
                 step=5.0
             )
-
             pago = st.checkbox("Pago")
 
-            entrega = st.selectbox(
+            entrega_label = st.selectbox(
                 "Entrega",
                 ["Cliente vai buscar", "Entrega no endereço"]
             )
+            entrega = entrega_label.upper()
 
             endereco_raw = None
-            if entrega == "Entrega no endereço":
+            if entrega_label == "Entrega no endereço":
                 endereco_raw = st.text_input("Endereço de entrega")
 
             horario = st.time_input("Horário combinado")
-
             observacoes_raw = st.text_area("Observações")
 
             submit = st.form_submit_button("Registrar serviço")
@@ -156,7 +141,7 @@ if menu == "Novo Serviço":
                 tipo_servico=tipo_servico.upper(),
                 valor=valor,
                 pago=pago,
-                entrega=entrega.upper(),
+                entrega=entrega,
                 endereco_entrega=endereco_raw.upper() if endereco_raw else None,
                 horario_retirada=horario,
                 observacoes=observacoes_raw.upper() if observacoes_raw else None
@@ -220,7 +205,7 @@ elif menu == "Carros do Dia":
                     st.markdown(f"⏰ **Horário:** {row['horario_retirada']}")
 
                 if row["observacoes"]:
-                    st.markdown(f"📝 **Obs:** {row['observacoes']}")
+                    st.markdown(f"📝 **Observações:** {row['observacoes']}")
 
                 st.divider()
 
