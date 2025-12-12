@@ -1,5 +1,6 @@
 import streamlit as st
 from datetime import date
+
 from db import (
     buscar_clientes_por_nome,
     inserir_cliente,
@@ -31,6 +32,9 @@ menu = st.sidebar.radio(
 # ==================================================
 if menu == "Novo Serviço":
 
+    # ------------------------------
+    # CLIENTE
+    # ------------------------------
     st.subheader("Cliente")
 
     nome_cliente_raw = st.text_input("Nome do cliente")
@@ -39,12 +43,14 @@ if menu == "Novo Serviço":
 
     if nome_cliente:
         sugestoes = buscar_clientes_por_nome(nome_cliente)
+
         if not sugestoes.empty:
             nomes = sugestoes["nome"].tolist()
             escolha = st.selectbox(
                 "Clientes encontrados",
                 ["Novo cliente"] + nomes
             )
+
             if escolha != "Novo cliente":
                 cliente_id = int(
                     sugestoes[sugestoes["nome"] == escolha]["id"].iloc[0]
@@ -58,6 +64,9 @@ if menu == "Novo Serviço":
             cliente_id = inserir_cliente(nome_cliente, telefone)
             st.success("Cliente criado")
 
+    # ------------------------------
+    # CARRO
+    # ------------------------------
     if cliente_id:
         st.divider()
         st.subheader("Carro")
@@ -70,6 +79,7 @@ if menu == "Novo Serviço":
                 f"{row['marca']} {row['modelo']} - {row['placa']}"
                 for _, row in carros.iterrows()
             ]
+
             escolha_carro = st.selectbox(
                 "Escolha um carro",
                 ["Novo carro"] + opcoes
@@ -104,45 +114,45 @@ if menu == "Novo Serviço":
                 )
                 st.success("Carro cadastrado")
 
+    # ------------------------------
+    # SERVIÇO
+    # ------------------------------
     if cliente_id and carro_id:
         st.divider()
         st.subheader("Serviço")
 
-        with st.form("form_servico"):
-            tipo_servico = st.selectbox(
-                "Tipo de serviço",
-                ["Lavagem", "Lavagem + Cera"]
-            )
-            valor = st.number_input(
-                "Valor (R$)",
-                min_value=0.0,
-                step=5.0
-            )
-            pago = st.checkbox("Pago")
+        tipo_servico = st.selectbox(
+            "Tipo de serviço",
+            ["Lavagem", "Lavagem + Cera"]
+        )
 
-            entrega_label = st.selectbox(
-                "Entrega",
-                ["Cliente vai buscar", "Entrega no endereço"]
-            )
-            entrega = entrega_label.upper()
+        valor = st.number_input(
+            "Valor (R$)",
+            min_value=0.0,
+            step=5.0
+        )
 
-            endereco_raw = None
-            if entrega_label == "Entrega no endereço":
-                endereco_raw = st.text_input("Endereço de entrega")
+        pago = st.checkbox("Pago")
 
-            horario = st.time_input("Horário combinado")
-            observacoes_raw = st.text_area("Observações")
+        entrega_label = st.selectbox(
+            "Modalidade",
+            ["Cliente vai buscar", "Entrega"]
+        )
 
-            submit = st.form_submit_button("Registrar serviço")
+        horario = st.time_input("Horário combinado")
 
-        if submit:
+        observacoes_raw = st.text_area(
+            "Observações",
+            placeholder="Ex: ENTREGA - AV BRASIL, 123"
+        )
+
+        if st.button("Registrar serviço"):
             inserir_servico(
                 carro_id=carro_id,
                 tipo_servico=tipo_servico.upper(),
                 valor=valor,
                 pago=pago,
-                entrega=entrega,
-                endereco_entrega=endereco_raw.upper() if endereco_raw else None,
+                entrega=entrega_label.upper(),
                 horario_retirada=horario,
                 observacoes=observacoes_raw.upper() if observacoes_raw else None
             )
@@ -194,18 +204,17 @@ elif menu == "Carros do Dia":
                 - Tipo: {row['tipo_servico']}
                 - Valor: R$ {row['valor']:.2f}
 
-                **🚚 Entrega**
-                - Modalidade: {row['entrega']}
+                **🚚 Modalidade**
+                - {row['entrega']}
                 """)
 
-                if row["endereco_entrega"]:
-                    st.markdown(f"📍 **Endereço:** {row['endereco_entrega']}")
+                st.markdown(
+                    f"⏰ **Horário:** {row['horario_retirada'] if row['horario_retirada'] else '—'}"
+                )
 
-                if row["horario_retirada"]:
-                    st.markdown(f"⏰ **Horário:** {row['horario_retirada']}")
-
-                if row["observacoes"]:
-                    st.markdown(f"📝 **Observações:** {row['observacoes']}")
+                st.markdown(
+                    f"📝 **Observações:** {row['observacoes'] if row['observacoes'] else '—'}"
+                )
 
                 st.divider()
 
