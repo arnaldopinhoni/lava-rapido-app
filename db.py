@@ -177,3 +177,28 @@ def get_servicos_do_dia():
     df = pd.read_sql(query, conn)
     conn.close()
     return df
+# ----------------------------------------------------------
+# ATUALIZAÇÕES RÁPIDAS (STATUS / PAGAMENTO)
+# ----------------------------------------------------------
+def atualizar_status(servico_id, status):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE servicos SET status = %s WHERE id = %s",
+        (status, servico_id)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def atualizar_pagamento(servico_id, pago):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE servicos SET pago = %s WHERE id = %s",
+        (pago, servico_id)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
