@@ -1,11 +1,11 @@
+import os
 import psycopg2
 import pandas as pd
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
+# ----------------------------------------------------------
+# CONEXÃO COM O BANCO (SUPABASE POOLER + SSL)
+# ----------------------------------------------------------
 def get_connection():
     return psycopg2.connect(
         host=os.getenv("DB_HOST"),
@@ -18,68 +18,162 @@ def get_connection():
 
 
 # ----------------------------------------------------------
-# INSERT
+# CLIENTES
 # ----------------------------------------------------------
-def insert_car(
-    nome_cliente, telefone, marca, modelo, placa,
-    tipo_servico, valor, pago,
-    entrega, endereco_entrega, horario_retirada,
-    observacoes
-):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    sql = """
-    INSERT INTO carros (
-        nome_cliente, telefone, marca, modelo, placa,
-        tipo_servico, valor, pago,
-        entrega, endereco_entrega, horario_retirada,
-        status, observacoes
-    )
-    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'Aguardando',%s)
+def buscar_clientes_por_nome(nome):
     """
-
-    cur.execute(sql, (
-        nome_cliente, telefone, marca, modelo, placa,
-        tipo_servico, valor, pago,
-        entrega, endereco_entrega, horario_retirada,
-        observacoes
-    ))
-
-    conn.commit()
-    cur.close()
-    conn.close()
-
-
-# ----------------------------------------------------------
-# SELECT ALL
-# ----------------------------------------------------------
-def get_all_cars():
+    Retorna até 10 clientes cujo nome contenha o texto informado
+    (case insensitive).
+    """
     conn = get_connection()
-    df = pd.read_sql("SELECT * FROM carros ORDER BY id DESC", conn)
+    query = """
+        SELECT id, nome
+        FROM clientes
+        WHERE nome ILIKE %s
+        ORDER BY nome
+        LIMIT 10
+    """
+    df = pd.read_sql(query, conn, params=[f"%{nome}%"])
     conn.close()
     return df
 
 
-# ----------------------------------------------------------
-# UPDATE STATUS
-# ----------------------------------------------------------
-def update_status(car_id, novo_status):
+def inserir_cliente(nome, telefone=None):
+    """
+    Insere um novo cliente e retorna o ID criado.
+    """
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("UPDATE carros SET status = %s WHERE id = %s", (novo_status, car_id))
+    cur.execute(
+        """
+        INSERT INTO clientes (nome, telefone)
+        VALUES (%s, %s)
+        RETURNING id
+        """,
+        (nome, telefone)
+    )
+    cliente_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return cliente_id
+
+
+# ----------------------------------------------------------
+# CARROS
+# ----------------------------------------------------------
+def get_carros_por_cliente(cliente_id):
+    """
+    Retorna todos os carros cadastrados para um cliente.
+    """
+    conn = get_connection()
+    query = """
+        SELECT id, marca, modelo, placa
+        FROM carros
+        WHERE cliente_id = %s
+        ORDER BY created_at DESC
+    """
+    df = pd.read_sql(query, conn, params=[cliente_id])
+    conn.close()
+    return df
+
+
+def inserir_carro(cliente_id, marca, modelo, placa):
+    """
+    Insere um novo carro para o cliente e retorna o ID criado.
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO carros (cliente_id, marca, modelo, placa)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id
+        """,
+        (cliente_id, marca, modelo, placa)
+    )
+    carro_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return carro_id
+
+
+# ----------------------------------------------------------
+# SERVIÇOS (LAVAGENS)
+# ----------------------------------------------------------
+def inserir_servico(
+    carro_id,
+    tipo_servico,
+    valor,
+    pago,
+    entrega,
+    endereco_entrega,
+    horario_retirada,
+    observacoes
+):
+    """
+    Registra um serviço (lavagem) para um carro.
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO servicos (
+            carro_id,
+            tipo_servico,
+            valor,
+            pago,
+            entrega,
+            endereco_entrega,
+            horario_retirada,
+            observacoes
+        )
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+        """,
+        (
+            carro_id,
+            tipo_servico,
+            valor,
+            pago,
+            entrega,
+            endereco_entrega,
+            horario_retirada,
+            observacoes
+        )
+    )
     conn.commit()
     cur.close()
     conn.close()
 
 
 # ----------------------------------------------------------
-# UPDATE PAYMENT
+# CONSULTA: SERVIÇOS DO DIA (para tela "Carros do Dia")
 # ----------------------------------------------------------
-def update_payment(car_id, pago):
+def get_servicos_do_dia():
+    """
+    Retorna os serviços cadastrados no dia atual,
+    já trazendo cliente e carro.
+    """
     conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("UPDATE carros SET pago = %s WHERE id = %s", (pago, car_id))
-    conn.commit()
-    cur.close()
+    query = """
+        SELECT
+            s.id,
+            c.nome AS cliente,
+            ca.marca,
+            ca.modelo,
+            ca.placa,
+            s.tipo_servico,
+            s.valor,
+            s.pago,
+            s.status,
+            s.horario_retirada
+        FROM servicos s
+        JOIN carros ca ON ca.id = s.carro_id
+        JOIN clientes c ON c.id = ca.cliente_id
+        WHERE DATE(s.data_registro) = CURRENT_DATE
+        ORDER BY s.id DESC
+    """
+    df = pd.read_sql(query, conn)
     conn.close()
+    return df
