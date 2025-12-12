@@ -174,13 +174,13 @@ def get_servicos_do_dia():
         FROM servicos s
         JOIN carros ca ON ca.id = s.carro_id
         JOIN clientes cl ON cl.id = ca.cliente_id
-        WHERE DATE(s.created_at) = CURRENT_DATE
         ORDER BY s.id DESC
     """
 
     df = pd.read_sql(query, conn)
     conn.close()
     return df
+
 # ----------------------------------------------------------
 # ATUALIZAÇÕES RÁPIDAS (STATUS / PAGAMENTO)
 # ----------------------------------------------------------
