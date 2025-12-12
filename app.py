@@ -188,15 +188,49 @@ elif menu == "Carros do Dia":
 
         st.divider()
 
+        status_map = {
+            "AGUARDANDO": "Aguardando",
+            "EM LAVAGEM": "Em lavagem",
+            "PRONTO": "Pronto",
+            "ENTREGUE": "Entregue"
+        }
+        status_reverse = {v: k for k, v in status_map.items()}
+
         for _, row in df.iterrows():
             with st.expander(f"{row['cliente']} - {row['placa']}"):
-                st.write(f"**Serviço:** {row['tipo_servico']}")
-                st.write(f"**Valor:** R$ {row['valor']:.2f}")
 
-                novo_status = st.selectbox(
+                st.markdown(f"""
+                **🚗 Veículo**
+                - Marca: {row['marca']}
+                - Modelo: {row['modelo']}
+                - Placa: {row['placa']}
+
+                **🧼 Serviço**
+                - Tipo: {row['tipo_servico']}
+                - Valor: R$ {row['valor']:.2f}
+
+                **🚚 Entrega**
+                - Modalidade: {row['entrega']}
+                """)
+
+                if row["endereco_entrega"]:
+                    st.markdown(f"📍 **Endereço:** {row['endereco_entrega']}")
+
+                if row["horario_retirada"]:
+                    st.markdown(f"⏰ **Horário:** {row['horario_retirada']}")
+
+                if row["observacoes"]:
+                    st.markdown(f"📝 **Obs:** {row['observacoes']}")
+
+                st.divider()
+
+                status_labels = list(status_map.values())
+                status_atual_label = status_map.get(row["status"], "Aguardando")
+
+                novo_status_label = st.selectbox(
                     "Status",
-                    ["Aguardando", "Em lavagem", "Pronto", "Entregue"],
-                    index=["Aguardando", "Em lavagem", "Pronto", "Entregue"].index(row["status"]),
+                    status_labels,
+                    index=status_labels.index(status_atual_label),
                     key=f"status_{row['id']}"
                 )
 
@@ -207,6 +241,9 @@ elif menu == "Carros do Dia":
                 )
 
                 if st.button("Atualizar", key=f"btn_{row['id']}"):
-                    atualizar_status(row["id"], novo_status.upper())
+                    atualizar_status(
+                        row["id"],
+                        status_reverse[novo_status_label]
+                    )
                     atualizar_pagamento(row["id"], pago_chk)
                     st.toast("Atualizado com sucesso")
