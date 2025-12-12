@@ -13,7 +13,7 @@ from db import (
 )
 
 # --------------------------------------------------
-# CONFIGURAÇÃO DA PÁGINA
+# CONFIGURAÇÃO
 # --------------------------------------------------
 st.set_page_config(
     page_title="Lava Rápido",
@@ -164,7 +164,7 @@ if menu == "Novo Serviço":
 # ==================================================
 elif menu == "Carros do Dia":
 
-    st.subheader("Serviços")
+    st.subheader("Serviços do dia")
 
     data_filtro = st.date_input("Data", value=date.today())
 
