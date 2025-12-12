@@ -1,111 +1,170 @@
 import streamlit as st
-import os
-from db import insert_car, get_all_cars, update_status, update_payment
-from datetime import time
+import pandas as pd
+
+from db import (
+    buscar_clientes_por_nome,
+    inserir_cliente,
+    get_carros_por_cliente,
+    inserir_carro,
+    inserir_servico,
+    get_servicos_do_dia
+)
 
 st.set_page_config(
-    page_title="Lava-Rápido",
-    layout="centered",  # Melhor para iPhone
+    page_title="Lava Rápido",
+    layout="centered"
 )
 
-st.markdown("""
-<style>
-    /* Aumenta espaço e tamanho dos botões no iPhone */
-    button[kind="primary"] {
-        padding: 14px 20px !important;
-        font-size: 18px !important;
-        width: 100%;
-    }
-    input, select, textarea {
-        font-size: 18px !important;
-    }
-</style>
-""", unsafe_allow_html=True)
+st.title("🚗 Lava Rápido")
 
-st.title("🚗 Controle do Lava-Rápido")
-
-menu = st.selectbox(
+menu = st.sidebar.radio(
     "Menu",
-    ["Cadastrar Carro", "Carros do Dia"],
+    ["Novo Serviço", "Carros do Dia"]
 )
 
+# ==========================================================
+# NOVO SERVIÇO
+# ==========================================================
+if menu == "Novo Serviço":
 
-# -------------------------------------------------------------
-# CADASTRO DE CARRO
-# -------------------------------------------------------------
-if menu == "Cadastrar Carro":
+    st.subheader("Cliente")
 
-    st.subheader("Novo carro")
+    nome_cliente = st.text_input("Nome do cliente")
 
-    nome = st.text_input("Nome do cliente")
-    telefone = st.text_input("Telefone")
-    marca = st.text_input("Marca")
-    modelo = st.text_input("Modelo")
-    placa = st.text_input("Placa")
+    cliente_id = None
 
-    tipo_servico = st.selectbox("Serviço", ["Lavagem", "Lavagem + Cera"])
-    valor = st.number_input("Valor", min_value=0.0, step=5.0)
-    pago = st.checkbox("Pagamento realizado?")
+    if nome_cliente:
+        sugestoes = buscar_clientes_por_nome(nome_cliente)
 
-    entrega = st.selectbox("Entrega", ["Cliente busca", "Lava-rápido entrega"])
-    endereco = ""
-    if entrega == "Lava-rápido entrega":
-        endereco = st.text_area("Endereço de entrega")
-
-    horario = st.time_input("Horário de retirada", value=time(9, 0))
-    observacoes = st.text_area("Observações")
-
-    if st.button("Salvar"):
-        if not nome or not placa:
-            st.error("Nome e placa são obrigatórios.")
-        else:
-            insert_car(
-                nome, telefone, marca, modelo, placa,
-                tipo_servico, valor, pago,
-                entrega, endereco, horario,
-                observacoes
+        if not sugestoes.empty:
+            nomes = sugestoes["nome"].tolist()
+            escolha = st.selectbox(
+                "Clientes encontrados",
+                ["Novo cliente"] + nomes
             )
-            st.success("Carro cadastrado com sucesso!")
 
+            if escolha != "Novo cliente":
+                cliente_id = int(
+                    sugestoes[sugestoes["nome"] == escolha]["id"].iloc[0]
+                )
+        else:
+            st.info("Cliente novo")
 
-# -------------------------------------------------------------
-# LISTA DE CARROS
-# -------------------------------------------------------------
+    telefone = None
+    if cliente_id is None and nome_cliente:
+        telefone = st.text_input("Telefone (opcional)")
+
+        if st.button("Criar cliente"):
+            cliente_id = inserir_cliente(nome_cliente, telefone)
+            st.success("Cliente criado com sucesso")
+
+    # ------------------------------------------------------
+    # CARROS
+    # ------------------------------------------------------
+    if cliente_id:
+        st.divider()
+        st.subheader("Carro")
+
+        carros = get_carros_por_cliente(cliente_id)
+
+        carro_id = None
+
+        if not carros.empty:
+            opcoes = [
+                f"{row['marca']} {row['modelo']} - {row['placa']}"
+                for _, row in carros.iterrows()
+            ]
+
+            escolha_carro = st.selectbox(
+                "Escolha um carro",
+                ["Novo carro"] + opcoes
+            )
+
+            if escolha_carro != "Novo carro":
+                linha = carros.iloc[
+                    opcoes.index(escolha_carro)
+                ]
+                carro_id = int(linha["id"])
+                marca = st.text_input("Marca", linha["marca"])
+                modelo = st.text_input("Modelo", linha["modelo"])
+                placa = st.text_input("Placa", linha["placa"])
+            else:
+                marca = st.text_input("Marca")
+                modelo = st.text_input("Modelo")
+                placa = st.text_input("Placa")
+        else:
+            st.info("Nenhum carro cadastrado para este cliente.")
+            marca = st.text_input("Marca")
+            modelo = st.text_input("Modelo")
+            placa = st.text_input("Placa")
+
+        if carro_id is None and placa:
+            if st.button("Salvar carro"):
+                carro_id = inserir_carro(
+                    cliente_id, marca, modelo, placa
+                )
+                st.success("Carro cadastrado")
+
+    # ------------------------------------------------------
+    # SERVIÇO
+    # ------------------------------------------------------
+    if cliente_id and carro_id:
+        st.divider()
+        st.subheader("Serviço")
+
+        tipo_servico = st.selectbox(
+            "Tipo de serviço",
+            ["Lavagem", "Lavagem + Cera"]
+        )
+
+        valor = st.number_input(
+            "Valor (R$)",
+            min_value=0.0,
+            step=5.0
+        )
+
+        pago = st.checkbox("Pago")
+
+        entrega = st.selectbox(
+            "Entrega",
+            ["Cliente vai buscar", "Entrega no endereço"]
+        )
+
+        endereco = None
+        if entrega == "Entrega no endereço":
+            endereco = st.text_input("Endereço de entrega")
+
+        horario = st.time_input("Horário combinado")
+
+        observacoes = st.text_area("Observações")
+
+        if st.button("Registrar serviço"):
+            inserir_servico(
+                carro_id=carro_id,
+                tipo_servico=tipo_servico,
+                valor=valor,
+                pago=pago,
+                entrega=entrega,
+                endereco_entrega=endereco,
+                horario_retirada=horario,
+                observacoes=observacoes
+            )
+            st.success("Serviço registrado com sucesso")
+
+# ==========================================================
+# CARROS DO DIA
+# ==========================================================
 elif menu == "Carros do Dia":
-    
-    st.subheader("Carros cadastrados")
-    df = get_all_cars()
+
+    st.subheader("Serviços de hoje")
+
+    df = get_servicos_do_dia()
 
     if df.empty:
-        st.info("Nenhum carro cadastrado hoje.")
+        st.info("Nenhum serviço cadastrado hoje.")
     else:
-        for _, row in df.iterrows():
-            with st.container():
-                st.markdown(
-                    f"""
-                    ### {row['marca']} {row['modelo']} — **{row['placa']}**
-                    **Cliente:** {row['nome_cliente']}  
-                    **Serviço:** {row['tipo_servico']} — R$ {row['valor']}  
-                    **Status:** {row['status']}  
-                    **Pagamento:** {"Pago" if row['pago'] else "Não pago"}  
-                    """
-                )
-                
-                novo_status = st.selectbox(
-                    "Atualizar status",
-                    ["Aguardando", "Lavando", "Pronto", "Entregue"],
-                    index=["Aguardando", "Lavando", "Pronto", "Entregue"].index(row["status"]),
-                    key=f"status_{row['id']}"
-                )
-
-                pago_novo = st.checkbox(
-                    "Marcar como pago", 
-                    value=row["pago"], 
-                    key=f"pago_{row['id']}"
-                )
-
-                if st.button("Salvar alterações", key=f"save_{row['id']}"):
-                    update_status(row["id"], novo_status)
-                    update_payment(row["id"], pago_novo)
-                    st.success("Atualizado!")
-                    st.experimental_rerun()
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True
+        )
