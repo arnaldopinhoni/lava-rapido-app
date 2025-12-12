@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 from datetime import date
 
 from db import (
@@ -33,9 +32,13 @@ menu = st.sidebar.radio(
 # ==================================================
 if menu == "Novo Serviço":
 
+    # ------------------------------
+    # CLIENTE
+    # ------------------------------
     st.subheader("Cliente")
 
-    nome_cliente = st.text_input("Nome do cliente")
+    nome_cliente_raw = st.text_input("Nome do cliente")
+    nome_cliente = nome_cliente_raw.upper() if nome_cliente_raw else None
     cliente_id = None
 
     if nome_cliente:
@@ -54,11 +57,16 @@ if menu == "Novo Serviço":
                 )
 
     if cliente_id is None and nome_cliente:
-        telefone = st.text_input("Telefone (opcional)")
+        telefone_raw = st.text_input("Telefone (opcional)")
+        telefone = telefone_raw.upper() if telefone_raw else None
+
         if st.button("Criar cliente"):
             cliente_id = inserir_cliente(nome_cliente, telefone)
             st.success("Cliente criado")
 
+    # ------------------------------
+    # CARRO
+    # ------------------------------
     if cliente_id:
         st.divider()
         st.subheader("Carro")
@@ -71,6 +79,7 @@ if menu == "Novo Serviço":
                 f"{row['marca']} {row['modelo']} - {row['placa']}"
                 for _, row in carros.iterrows()
             ]
+
             escolha_carro = st.selectbox(
                 "Escolha um carro",
                 ["Novo carro"] + opcoes
@@ -79,23 +88,35 @@ if menu == "Novo Serviço":
             if escolha_carro != "Novo carro":
                 linha = carros.iloc[opcoes.index(escolha_carro)]
                 carro_id = int(linha["id"])
-                marca = linha["marca"]
-                modelo = linha["modelo"]
-                placa = linha["placa"]
+                marca_raw = linha["marca"]
+                modelo_raw = linha["modelo"]
+                placa_raw = linha["placa"]
             else:
-                marca = st.text_input("Marca")
-                modelo = st.text_input("Modelo")
-                placa = st.text_input("Placa")
+                marca_raw = st.text_input("Marca")
+                modelo_raw = st.text_input("Modelo")
+                placa_raw = st.text_input("Placa")
         else:
-            marca = st.text_input("Marca")
-            modelo = st.text_input("Modelo")
-            placa = st.text_input("Placa")
+            marca_raw = st.text_input("Marca")
+            modelo_raw = st.text_input("Modelo")
+            placa_raw = st.text_input("Placa")
+
+        marca = marca_raw.upper() if marca_raw else None
+        modelo = modelo_raw.upper() if modelo_raw else None
+        placa = placa_raw.upper() if placa_raw else None
 
         if carro_id is None and placa:
             if st.button("Salvar carro"):
-                carro_id = inserir_carro(cliente_id, marca, modelo, placa)
+                carro_id = inserir_carro(
+                    cliente_id,
+                    marca,
+                    modelo,
+                    placa
+                )
                 st.success("Carro cadastrado")
 
+    # ------------------------------
+    # SERVIÇO
+    # ------------------------------
     if cliente_id and carro_id:
         st.divider()
         st.subheader("Serviço")
@@ -105,29 +126,42 @@ if menu == "Novo Serviço":
                 "Tipo de serviço",
                 ["Lavagem", "Lavagem + Cera"]
             )
-            valor = st.number_input("Valor (R$)", min_value=0.0, step=5.0)
+
+            valor = st.number_input(
+                "Valor (R$)",
+                min_value=0.0,
+                step=5.0
+            )
+
             pago = st.checkbox("Pago")
+
             entrega = st.selectbox(
                 "Entrega",
                 ["Cliente vai buscar", "Entrega no endereço"]
             )
-            endereco = st.text_input("Endereço") if entrega == "Entrega no endereço" else None
+
+            endereco_raw = None
+            if entrega == "Entrega no endereço":
+                endereco_raw = st.text_input("Endereço de entrega")
+
             horario = st.time_input("Horário combinado")
-            observacoes = st.text_area("Observações")
+
+            observacoes_raw = st.text_area("Observações")
+
             submit = st.form_submit_button("Registrar serviço")
 
         if submit:
             inserir_servico(
-                carro_id,
-                tipo_servico,
-                valor,
-                pago,
-                entrega,
-                endereco,
-                horario,
-                observacoes
+                carro_id=carro_id,
+                tipo_servico=tipo_servico.upper(),
+                valor=valor,
+                pago=pago,
+                entrega=entrega.upper(),
+                endereco_entrega=endereco_raw.upper() if endereco_raw else None,
+                horario_retirada=horario,
+                observacoes=observacoes_raw.upper() if observacoes_raw else None
             )
-            st.success("Serviço registrado")
+            st.success("Serviço registrado com sucesso")
             st.toast("Lavagem registrada 🚗🧼")
 
 # ==================================================
@@ -135,20 +169,21 @@ if menu == "Novo Serviço":
 # ==================================================
 elif menu == "Carros do Dia":
 
-    data = st.date_input("Data", value=date.today())
+    st.subheader("Serviços")
+
+    data_filtro = st.date_input("Data", value=date.today())
 
     df = get_servicos_do_dia()
-    df = df[df["horario_retirada"].notna()]
 
     if df.empty:
         st.info("Nenhum serviço encontrado.")
     else:
         total = df["valor"].sum()
-        pago = df[df["pago"]]["valor"].sum()
-        pendente = total - pago
+        pago_total = df[df["pago"]]["valor"].sum()
+        pendente = total - pago_total
 
-        st.metric("💰 Total do dia", f"R$ {total:.2f}")
-        st.metric("✅ Pago", f"R$ {pago:.2f}")
+        st.metric("💰 Total", f"R$ {total:.2f}")
+        st.metric("✅ Pago", f"R$ {pago_total:.2f}")
         st.metric("⏳ Pendente", f"R$ {pendente:.2f}")
 
         st.divider()
@@ -172,6 +207,6 @@ elif menu == "Carros do Dia":
                 )
 
                 if st.button("Atualizar", key=f"btn_{row['id']}"):
-                    atualizar_status(row["id"], novo_status)
+                    atualizar_status(row["id"], novo_status.upper())
                     atualizar_pagamento(row["id"], pago_chk)
                     st.toast("Atualizado com sucesso")
