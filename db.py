@@ -151,29 +151,33 @@ def inserir_servico(
 # CONSULTA: SERVIÇOS DO DIA (para tela "Carros do Dia")
 # ----------------------------------------------------------
 def get_servicos_do_dia():
-    """
-    Retorna os serviços cadastrados no dia atual,
-    já trazendo cliente e carro.
-    """
     conn = get_connection()
+
     query = """
         SELECT
             s.id,
-            c.nome AS cliente,
+            cl.nome AS cliente,
+
             ca.marca,
             ca.modelo,
             ca.placa,
+
             s.tipo_servico,
             s.valor,
-            s.pago,
             s.status,
-            s.horario_retirada
+            s.pago,
+
+            s.entrega,
+            s.endereco_entrega,
+            s.horario_retirada,
+            s.observacoes
         FROM servicos s
         JOIN carros ca ON ca.id = s.carro_id
-        JOIN clientes c ON c.id = ca.cliente_id
-        WHERE DATE(s.data_registro) = CURRENT_DATE
+        JOIN clientes cl ON cl.id = ca.cliente_id
+        WHERE DATE(s.created_at) = CURRENT_DATE
         ORDER BY s.id DESC
     """
+
     df = pd.read_sql(query, conn)
     conn.close()
     return df
